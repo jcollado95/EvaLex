@@ -1,0 +1,4 @@
+model_name: llama3-8b-instruct
+words: 100_palabras_DEA.tsv
+iter: 3
+prompts: prompts/v2.json
