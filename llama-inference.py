@@ -8,7 +8,7 @@ import pandas as pd
 
 from tqdm import tqdm
 
-def get_definition_from_word(word, cat, prompt):
+def get_definition_from_word(word, cat, prompt) -> str:
     for message in prompt:
         if message["role"] == "user" and "{word}" in message["content"] and "{cat}" in message["content"]:
             message["content"] = message["content"].format(word=word, cat=cat)
@@ -16,7 +16,7 @@ def get_definition_from_word(word, cat, prompt):
     definition = get_response(prompt)
     return definition["content"]
 
-def get_words_from_definition(definition, cat, prompt):
+def get_words_from_definition(definition, cat, prompt) -> str:
     for message in prompt:
         if message["role"] == "user" and "{definition}" in message["content"] and "{cat}" in message["content"]:
             message["content"] = message["content"].format(definition=definition, cat=cat)
@@ -36,7 +36,8 @@ def get_response(prompt):
         eos_token_id=terminators,
         do_sample=False,
         temperature=None,
-        top_k = None
+        top_k = None,
+        top_p = None
     )
     return outputs[0]["generated_text"][-1]
 
@@ -74,7 +75,7 @@ if __name__ == "__main__":
             row.word, 
             row.category, 
             prompt
-        )
+        ).lower()
 
         # Postprocess possible word leaks within the definition
         if row.word in predicted_definition:
@@ -85,10 +86,10 @@ if __name__ == "__main__":
             predicted_definition,
             row.category,
             prompt
-        )
+        ).lower()
 
         # Evaluate the results
-        if row.word.lower() in predicted_words.lower():
+        if row.word.lower() in predicted_words:
             print(f"La palabra {row.word} está en la lista de palabras {predicted_words}.")
             results.loc[len(results.index)] = [row.word, predicted_definition, predicted_words, True]
         else:

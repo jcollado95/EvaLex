@@ -1,6 +1,7 @@
 # Custom stuff
 slurm-output
 launcher.sbs
+results/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

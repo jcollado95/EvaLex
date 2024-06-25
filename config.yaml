@@ -1,4 +1,4 @@
-model_name: llama3-8b-instruct
+model_name: Gemma-7b-it
 words: 100_palabras_DEA.tsv
 iter: 3
-prompts: prompts/v2.json
+prompts: prompts/mistral/v2.json
