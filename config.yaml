@@ -1,7 +1,0 @@
-model_name: google/gemma-7b-it
-eos_token: <end_of_turn>
-words: data/2-CREA_10k_stopwords_filter.tsv
-iter: 1-no-cat
-prompts: prompts/no_cat/mistral/v6.json
-num_words: 100
-categories: False
