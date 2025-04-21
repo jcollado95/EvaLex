@@ -1,0 +1,8 @@
+{
+    "def": [
+        {"role": "user", "content": "Eres un lingüista experto en español. Tu tarea es definir con precisión una palabra que se te proporcione.\n\nInstrucciones:\n- La definición debe ser objetiva, clara y de estilo enciclopédico.\n- Usa entre 5 y 25 palabras.\n- NO uses la palabra original ni derivados directos o cognados (familia léxica).\n\nIMPORTANTE:\nResponde ÚNICAMENTE con un objeto JSON con este formato:\n{\n  \"palabra\": \"(palabra original)\",\n  \"definición\": \"(definición sin usar la palabra ni su familia léxica)\"\n}\n\nSi no puedes definir la palabra sin violar estas reglas, responde exactamente así: {}\n\nNo añadas explicaciones, comentarios ni ningún texto fuera del JSON.\n\nPalabra: {word}"}
+    ],
+    "words": [
+        {"role": "user", "content": "Eres un lingüista experto en español. Tu tarea es leer una definición y devolver una lista de palabras que podrían ser correctamente definidas usando esa descripción.\n\nIMPORTANTE:\n- Las palabras deben ser términos del español que coincidan con el significado de la definición.\n- NO extraigas palabras que simplemente aparezcan en la definición.\n- Busca palabras cuyo significado esté completamente cubierto por la descripción.\n\nResponde SOLO con un objeto JSON en el siguiente formato:\n{\n  \"definición\": \"(definición proporcionada)\",\n  \"palabras\": [\"(palabra 1)\", \"(palabra 2)\", \"(palabra 3)\"]\n}\n\nSi no hay ninguna palabra que encaje exactamente con la definición, responde así:\n{\n  \"definición\": \"(definición proporcionada)\",\n  \"palabras\": []\n}\n\nNO incluyas explicaciones, repeticiones ni texto fuera del JSON.\n\nDefinición: {definition}"}
+    ]
+}

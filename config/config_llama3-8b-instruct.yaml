@@ -1,0 +1,9 @@
+model_name: meta-llama/Llama-3-8B-Instruct
+eos_token: <|end_of_text|>
+words: data/CREA_10k-v2/4-CREA_10k_lemmas.tsv
+iter: promptV8-no-fs
+prompts: prompts/no_cat/llama/v8.json
+num_words: 4594
+categories: False
+batch_size_def: 2
+batch_size_words: 4
