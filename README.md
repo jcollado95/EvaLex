@@ -1,2 +1,3 @@
-# DSR-vocabulary
-Experiments with DSR to determine vocabulary knowledge in LLMs.
+# EvaLex
+
+A benchmark for evaluating Lexical Competence in LLMs.
