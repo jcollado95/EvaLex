@@ -32,14 +32,20 @@ def create_dataset_from_prompt(definitions, words_prompt):
         prompt_ds.append(prompt)
     return prompt_ds
 
-def generate_words(dataset, model, tokenizer, batch_size):
+def generate_words(dataset, model, tokenizer, batch_size, stop_strings):
     words = []
 
-    generation_config = GenerationConfig(
-        max_new_tokens=64, 
-        do_sample=False,
-        stop_strings="}"
-    )
+    if stop_strings:
+        generation_config = GenerationConfig(
+            max_new_tokens=128, 
+            do_sample=False,
+            stop_strings=stop_strings
+        )
+    else:
+        generation_config = GenerationConfig(
+            max_new_tokens=128, 
+            do_sample=False
+        )  
 
     # Generate words from definitions
     for i in tqdm(range(0, len(dataset), batch_size)):
@@ -63,10 +69,10 @@ def extract_json(text):
     """ Intenta extraer JSON de un texto. """
     try:
         json_data = json.loads(text)
-        if isinstance(json_data, dict) and "definición" in json_data:
+        if isinstance(json_data, dict) and "palabras" in json_data:
             return json_data
         else:
-            print(f"JSON mal formado o sin 'definición': {text}")
+            print(f"JSON mal formado o sin 'palabras': {text}")
             return None
     except json.JSONDecodeError as e:
         print(f"Error al decodificar JSON: {e} - Texto: {text}")
@@ -90,11 +96,13 @@ def process_words(words, definitions):
 
         if predicted_words_data and "palabras" in predicted_words_data:
             predicted_words_text = predicted_words_data["palabras"]
+            predicted_words_text = " ".join(map(str, predicted_words_text))
         else:
             # Si no tiene un formato JSON correcto, intentamos limpiar la definición lo mejor posible
             predicted_words_text = predicted_words  # Usar el texto original si no es JSON
             predicted_words_text = predicted_words_text.split(":")[-1]    # Ignorar la clave del JSON si existe
             predicted_words_text = predicted_words_text.replace('"', '') # Eliminar posibles comillas dobles sobrantes
+            predicted_words_text = predicted_words_text.replace("'", '') # Eliminar posibles comillas simples sobrantes
             predicted_words_text = predicted_words_text.replace('{', '') # Eliminar posibles llaves sobrantes
             predicted_words_text = predicted_words_text.replace('}', '') # Eliminar posibles llaves sobrantes
             predicted_words_text = predicted_words_text.replace('[', '') # Eliminar posibles corchetes sobrantes
@@ -106,7 +114,7 @@ def process_words(words, definitions):
 
         print(f"Texto final: {predicted_words_text}")
         
-        outputs[id] = [word, cat, definition, predicted_words_text] if config["categories"] else [word, definition, predicted_words]
+        outputs[id] = [word, cat, definition, predicted_words_text] if config["categories"] else [word, definition, predicted_words_text]
     return outputs
     
 if __name__ == "__main__":
@@ -141,8 +149,9 @@ if __name__ == "__main__":
     prompt_ds = create_dataset_from_prompt(definitions, prompts["words"])
 
     batch_size = config["batch_size_words"]
+    stop_strings = config["stop_strings"]
 
-    words = generate_words(prompt_ds, model, tokenizer, batch_size)
+    words = generate_words(prompt_ds, model, tokenizer, batch_size, stop_strings)
     outputs = process_words(words, definitions)
     columns = ["word", "category", "definition", "predicted_words"] if config["categories"] else ["word", "definition", "predicted_words"]
     output_df = pd.DataFrame.from_dict(outputs, orient="index", columns=columns)

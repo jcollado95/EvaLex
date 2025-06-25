@@ -1,9 +1,10 @@
 model_name: 01-ai/Yi-6B-Chat
 eos_token: <|endoftext|>
-words: data/DEA_100/100_palabras_DEA_v5.tsv
-iter: promptV8-no-fs
-prompts: prompts/no_cat/llama/v8.json
-num_words: 4594
+words: data/CREA_10k-v2/3-CREA_10k_pos_filter.tsv
+iter: 11-final
+prompts: prompts/no_cat/llama/v9.json
+num_words: 7784
 categories: False
-batch_size_def: 10
-batch_size_words: 20
+batch_size_def: 8
+batch_size_words: 16
+stop_strings: null

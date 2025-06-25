@@ -5,6 +5,8 @@ import yaml
 import sys
 import re
 import torch
+import stanza
+import unicodedata
 
 import pandas as pd
 
@@ -35,7 +37,7 @@ def create_dataset_from_prompt(words, def_prompt):
         prompt_ds.append(prompt)
     return prompt_ds
 
-def generate_definitions(dataset, model, tokenizer, num_return_sequences, batch_size):
+def generate_definitions(dataset, model, tokenizer, num_return_sequences, batch_size, stop_strings):
     # Enable mixed precision
     torch.amp.autocast("cuda", enabled=True)
     
@@ -43,17 +45,30 @@ def generate_definitions(dataset, model, tokenizer, num_return_sequences, batch_
     model = torch.compile(model)
 
     definitions = []
-    generation_config = GenerationConfig(
-        max_new_tokens=100, 
-        do_sample=True, 
-        temperature=1.0,
-        num_return_sequences=num_return_sequences,
-        eos_token_id=[
-            tokenizer.eos_token_id,
-            tokenizer.convert_tokens_to_ids(config["eos_token"])
-        ],
-        stop_strings="}"
-    )
+
+    if not stop_strings: # Quick fix for Yi problems with stop_strings parameter
+        generation_config = GenerationConfig(
+            max_new_tokens=128, 
+            do_sample=True, 
+            temperature=1.0,
+            num_return_sequences=num_return_sequences,
+            eos_token_id=[
+                tokenizer.eos_token_id,
+                tokenizer.convert_tokens_to_ids(config["eos_token"])
+            ]
+        )
+    else:
+        generation_config = GenerationConfig(
+            max_new_tokens=128, 
+            do_sample=True, 
+            temperature=1.0,
+            num_return_sequences=num_return_sequences,
+            eos_token_id=[
+                tokenizer.eos_token_id,
+                tokenizer.convert_tokens_to_ids(config["eos_token"])
+            ],
+            stop_strings=stop_strings
+        )
     # Generate definitions from words
     for i in tqdm(range(0, len(dataset), batch_size)):
         batch = dataset[i:i+batch_size]
@@ -113,9 +128,64 @@ def extract_json(text):
         print(f"Error al decodificar JSON: {e} - Texto: {text}")
         return None
 
-def process_definitions_v2(definitions, words, num_return_sequences):
+def clean_text(text):
+    """
+    Remove accents and special characters from text.
+    Keeps only alphanumeric characters and spaces.
+    """
+    # Normalize and remove accents
+    text = ''.join(
+        c for c in unicodedata.normalize('NFD', text)
+        if unicodedata.category(c) != 'Mn'
+    )
+    # Remove special characters (keep only letters, numbers and spaces)
+    text = re.sub(r'[^A-Za-z0-9\s]', '', text)
+    return text
+
+def anonymize_word_by_lemma(nlp, text, base_lemma):
+    """
+    Replaces all inflected forms of a word (by lemma) with the token _.
+
+    Args:
+        nlp: A Stanza pipeline.
+        text (str): Input text.
+        base_lemma (str): Lemma of the word to replace.
+
+    Returns:
+        str: Modified text with matching words replaced by "_".
+    """
+    base_lemma_norm = clean_text(base_lemma.lower())
+    doc = nlp(str(text))
+    output = []
+    index = 0
+
+    for sentence in doc.sentences:
+        for token in sentence.tokens:
+            word = token.text
+            start = token.start_char
+            end = token.end_char
+
+            # Use lemma of the first word in the token (as Stanza supports multi-word tokens)
+            lemma = token.words[0].lemma if token.words else ''
+            lemma_norm = clean_text(lemma.lower()) if lemma else ''
+
+            # Add untouched text between previous token and current
+            output.append(text[index:start])
+
+            # Replace word if normalized lemma matches
+            if lemma_norm == base_lemma_norm:
+                output.append("_")
+            else:
+                output.append(word)
+
+            index = end
+
+    output.append(text[index:])  # Add any remaining text
+    return ''.join(output)
+
+def process_definitions_v2(definitions, words, num_return_sequences, nlp):
     outputs = {}
-    
+
     for id, definition in enumerate(definitions):
         word = words.loc[id // num_return_sequences].word.lower()
         print(f"Palabra: {word} - Texto original: {definition}")
@@ -129,25 +199,17 @@ def process_definitions_v2(definitions, words, num_return_sequences):
             # Si no tiene un formato JSON correcto, intentamos limpiar la definición lo mejor posible
             definition_text = definition  # Usar el texto original si no es JSON
             definition_text = definition_text.split(":")[-1]    # Ignorar la clave del JSON si existe
-            definition_text = definition_text.replace('"', '') # Eliminar posibles comillas dobles sobrantes
-            definition_text = definition_text.replace('{', '') # Eliminar posibles llaves sobrantes
-            definition_text = definition_text.replace('}', '') # Eliminar posibles llaves sobrantes
-            definition_text = definition_text.replace('[', '') # Eliminar posibles corchetes sobrantes
-            definition_text = definition_text.replace(']', '') # Eliminar posibles corchetes sobrantes
-            definition_text = definition_text.strip()   # Eliminar posibles espacios sobrantes
-            
-        if definition_text:            
-            # Anonimización con preservación de capitalización
-            def replace_match(match):
-                return "<word>" if match.group().islower() else "<Word>"
-            
-            anonymized_definition = re.sub(
-                rf'\b{re.escape(word)}\b', replace_match, definition_text, flags=re.IGNORECASE
-            )
+            definition_text = re.sub(r'[\{\}\[\]\"]', '', definition_text).strip()
+
+        if definition_text:
+            try:
+                anonymized_definition = anonymize_word_by_lemma(nlp, definition_text, word)
+            except Exception as e:
+                print(f"Error in lemmatization: {e}")
+                anonymized_definition = re.sub(rf'\b{re.escape(word)}\b', '_', definition_text, flags=re.IGNORECASE)
         else:
             anonymized_definition = "Término no conocido."
         
-        print(f"Texto final: {anonymized_definition}")
         outputs[id] = [word, anonymized_definition]
     
     return outputs
@@ -183,10 +245,13 @@ if __name__ == "__main__":
     prompt_ds = create_dataset_from_prompt(words, prompts["def"])
 
     batch_size = config["batch_size_def"]
+    stop_strings = config["stop_strings"]
     num_return_sequences = 5
 
-    definitions = generate_definitions(prompt_ds, model, tokenizer, num_return_sequences, batch_size)
-    outputs = process_definitions_v2(definitions, words, num_return_sequences)
+    nlp = stanza.Pipeline(lang='es', dir='/mnt/beegfs/jcollado/stanza_resources/', processors='tokenize,mwt,pos,lemma', download_method=None)
+
+    definitions = generate_definitions(prompt_ds, model, tokenizer, num_return_sequences, batch_size, stop_strings)
+    outputs = process_definitions_v2(definitions, words, num_return_sequences, nlp=nlp)
     columns = ["word", "category", "definition"] if config["categories"] else ["word", "definition"]
     output_df = pd.DataFrame.from_dict(outputs, orient="index", columns=columns)
 
