@@ -2,7 +2,6 @@
 slurm-output
 launcher.sbs
 results
-data
 generations
 
 # Byte-compiled / optimized / DLL files
