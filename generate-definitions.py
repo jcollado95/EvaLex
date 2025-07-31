@@ -210,7 +210,8 @@ def process_definitions_v2(definitions, words, num_return_sequences, nlp):
         else:
             anonymized_definition = "Término no conocido."
         
-        outputs[id] = [word, anonymized_definition]
+        anonymized_definition = anonymized_definition.split("\n\n")[0]
+        outputs[id] = [word, str(anonymized_definition)]
     
     return outputs
 

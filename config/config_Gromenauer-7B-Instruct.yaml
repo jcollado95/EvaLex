@@ -1,10 +1,10 @@
 model_name: bertin-project/Gromenauer-7B-Instruct
 eos_token: </s>
-words: data/CREA_10k-v2/3-CREA_10k_pos_filter.tsv
+words: data/DEA_100/100_palabras_DEA_v5.tsv
 iter: 11-final
 prompts: prompts/no_cat/llama/v9.json
-num_words: 7784
+num_words: 100
 categories: False
-batch_size_def: 8
-batch_size_words: 16
+batch_size_def: 20
+batch_size_words: 20
 stop_strings: "}"

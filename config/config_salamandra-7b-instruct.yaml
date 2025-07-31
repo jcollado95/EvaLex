@@ -5,6 +5,6 @@ iter: 11-final
 prompts: prompts/no_cat/llama/v9.json
 num_words: 7784
 categories: False
-batch_size_def: 8
-batch_size_words: 16
+batch_size_def: 10
+batch_size_words: 10
 stop_strings: "}"

@@ -138,7 +138,7 @@ if __name__ == "__main__":
     # Sanitize model name
     model_name = model_name.replace("/", "_")
     definitions_path = f"generations/v{config['iter']}/{model_name}_{config['words'].split('.')[0].split('/')[-1]}.tsv"
-    definitions = pd.read_csv(definitions_path, sep="\t")
+    definitions = pd.read_csv(definitions_path, sep="\t", keep_default_na=False, na_values=[])
 
     print(f"Generating list of words with {model_name}")
 
