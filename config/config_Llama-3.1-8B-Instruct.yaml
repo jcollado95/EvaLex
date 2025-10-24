@@ -2,7 +2,7 @@ model_name: meta-llama/Llama-3.1-8B-Instruct
 eos_token: <|eot_id|>
 words: data/DEA_100/100_palabras_DEA_v5.tsv
 iter: 11-final
-prompts: prompts/no_cat/llama/v9.json
+prompts: prompts/llama/v9.json
 num_words: 100
 categories: False
 batch_size_def: 10

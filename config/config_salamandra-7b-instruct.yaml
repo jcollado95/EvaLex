@@ -1,8 +1,8 @@
 model_name: BSC-LT/salamandra-7b-instruct
 eos_token: </s>
-words: data/CREA_10k-v2/3-CREA_10k_pos_filter.tsv
+words: data/CREA_10k/3-CREA_10k_pos_filter.tsv
 iter: 11-final
-prompts: prompts/no_cat/llama/v9.json
+prompts: prompts/llama/v9.json
 num_words: 7784
 categories: False
 batch_size_def: 10

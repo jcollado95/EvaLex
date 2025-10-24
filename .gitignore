@@ -1,9 +1,8 @@
 # Custom stuff
 slurm-output
 launcher.sbs
-results
-generations
 requirements
+archived
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

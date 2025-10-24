@@ -2,7 +2,7 @@ model_name: google/gemma-7b-it
 eos_token: <end_of_turn>
 words: data/DEA_100/100_palabras_DEA_v5.tsv
 iter: 11-final
-prompts: prompts/no_cat/mistral/v9.json
+prompts: prompts/mistral/v9.json
 num_words: 100
 categories: False
 batch_size_def: 20
