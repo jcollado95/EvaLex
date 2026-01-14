@@ -1,46 +1,76 @@
-import yaml
-import os
+#!/usr/bin/env python3
+"""
+Evaluate word predictions against original words.
+
+This script is the third and final step in the EvaLex evaluation pipeline.
+It checks if the LLM was able to predict the original words from the definitions.
+
+Usage:
+    python evaluate-words.py config.yaml
+"""
+
 import sys
+import os
+import argparse
 
 import pandas as pd
-from nltk.tokenize import word_tokenize
 
-with open(sys.argv[1], "r") as f:
-    config = yaml.load(f, Loader=yaml.FullLoader)
+# Add parent directory to path for evalex import
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-model_name = config["model_name"]
+from evalex.config import EvaLexConfig
+from evalex.pipeline import WordEvaluator
 
-# Sanitize model name
-model_name = model_name.replace("/", "_")
 
-print(f"Evaluating list of words with {model_name}")
+def main():
+    parser = argparse.ArgumentParser(description="Evaluate word predictions")
+    parser.add_argument("config", help="Path to YAML config file")
+    args = parser.parse_args()
+    
+    # Load config
+    config = EvaLexConfig.from_yaml(args.config)
+    
+    print(f"Evaluating words for {config.model_name}")
+    
+    # Load generations from previous steps
+    generations_path = config.get_generations_path() / config.get_output_filename()
+    
+    if not generations_path.exists():
+        print(f"Error: Generations file not found: {generations_path}")
+        print("Please run generate-definitions.py and generate-words.py first.")
+        sys.exit(1)
+    
+    generations_df = pd.read_csv(generations_path, sep="\t")
+    print(f"Loaded {len(generations_df)} generations from {generations_path}")
+    
+    # Create evaluator
+    evaluator = WordEvaluator(num_return_sequences=config.num_return_sequences)
+    
+    # Evaluate
+    print("Evaluating predictions...")
+    results_df, metrics = evaluator.evaluate(generations_df)
+    
+    # Print metrics
+    print(f"\n{'='*50}")
+    print(f"LEXICAL COMPETENCE RESULTS")
+    print(f"{'='*50}")
+    print(f"Model: {config.model_name}")
+    print(f"Words evaluated: {metrics['total_count']}")
+    print(f"Words known: {metrics['known_count']}")
+    print(f"Accuracy: {metrics['accuracy_percentage']}")
+    print(f"{'='*50}\n")
+    
+    # Save results
+    output_dir = config.get_results_path()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    output_file = output_dir / config.get_output_filename()
+    results_df.to_csv(output_file, sep="\t", index=False)
+    
+    print(f"Saved results to {output_file}")
+    
+    return metrics
 
-definitions_path = f"generations/v{config['iter']}/{model_name}_{config['words'].split('.')[0].split('/')[-1]}.tsv"
-df = pd.read_csv(definitions_path, sep="\t")
 
-df = df.fillna("") # Make sure all cells have valid values
-
-# Function to check if the word exists in the predicted_words
-df['known'] = df.apply(lambda row: row['word'] in word_tokenize(row['predicted_words']), axis=1)
-
-# Group every 5 rows and check if any 'known' is True in the group
-group_known = df.groupby(df.index // 5)['known'].transform('any')
-
-# Select one word from each group (since each group contains the same word)
-unique_words = df.groupby(df.index // 5)['word'].first()
-
-# Create the new DataFrame
-result_df = pd.DataFrame({
-    'word': unique_words,
-    'group_known': group_known[::5].values  # Take one value for each group
-})
-
-# Save results
-outname = f"{model_name}_{config['words'].split('.')[0].split('/')[-1]}.tsv"
-outdir = f"results/v{config['iter']}"
-if not os.path.exists(outdir):
-    os.mkdir(outdir) 
-
-fullname = os.path.join(outdir, outname)
-
-result_df.to_csv(fullname, sep="\t", index=False)
+if __name__ == "__main__":
+    main()

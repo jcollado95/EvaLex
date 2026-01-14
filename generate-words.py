@@ -1,167 +1,90 @@
-import json
-import copy
-import os
-import yaml
+#!/usr/bin/env python3
+"""
+Generate candidate words from definitions.
+
+This script is the second step in the EvaLex evaluation pipeline.
+It takes the generated definitions and asks the LLM to predict the original words.
+
+Usage:
+    python generate-words.py config.yaml
+    python generate-words.py config.yaml --backend openai
+"""
+
 import sys
+import os
+import argparse
 
 import pandas as pd
+from transformers import set_seed
 
-from tqdm import tqdm
-from transformers import (
-    AutoModelForCausalLM, 
-    GenerationConfig, 
-    AutoTokenizer, 
-    set_seed
-)
+# Add parent directory to path for evalex import
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-def create_dataset_from_prompt(definitions, words_prompt):
-    prompt_ds = []
+from evalex.config import EvaLexConfig
+from evalex.models import create_backend
+from evalex.prompts import PromptManager
+from evalex.pipeline import WordGenerator
 
-    for row in tqdm(definitions.itertuples(index=False)):
-        prompt = copy.deepcopy(words_prompt)
-        
-        for message in prompt:
-            if message["role"] == "user" and "{definition}" in message["content"] and "{cat}" in message["content"]:
-                message["content"] = message["content"].replace("{definition}", row.definition)
-                message["content"] = message["content"].replace("{cat}", row.category)
-            elif message["role"] == "user" and "{definition}" in message["content"]:
-                message["content"] = message["content"].replace("{definition}", row.definition)
-            else:
-                pass
 
-        prompt_ds.append(prompt)
-    return prompt_ds
-
-def generate_words(dataset, model, tokenizer, batch_size, stop_strings):
-    words = []
-
-    if stop_strings:
-        generation_config = GenerationConfig(
-            max_new_tokens=128, 
-            do_sample=False,
-            stop_strings=stop_strings
-        )
-    else:
-        generation_config = GenerationConfig(
-            max_new_tokens=128, 
-            do_sample=False
-        )  
-
-    # Generate words from definitions
-    for i in tqdm(range(0, len(dataset), batch_size)):
-        batch = dataset[i:i+batch_size]
-
-        model_inputs = tokenizer.apply_chat_template(
-            batch, 
-            add_generation_prompt=True, 
-            padding=True, 
-            truncation=False,
-            return_tensors="pt"
-        ).to("cuda")
-
-        input_length = model_inputs.shape[1] # Get input_length to remove the whole input from the decoding output
-        outputs = model.generate(model_inputs, generation_config=generation_config, tokenizer=tokenizer)
-        words += tokenizer.batch_decode(outputs[:, input_length:], skip_special_tokens=True)
+def main():
+    parser = argparse.ArgumentParser(description="Generate words from definitions")
+    parser.add_argument("config", help="Path to YAML config file")
+    parser.add_argument("--backend", choices=["local", "openai"], default=None,
+                        help="Override backend type from config")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed")
+    args = parser.parse_args()
     
-    return words
-
-def extract_json(text):
-    """ Intenta extraer JSON de un texto. """
-    try:
-        json_data = json.loads(text)
-        if isinstance(json_data, dict) and "palabras" in json_data:
-            return json_data
-        else:
-            print(f"JSON mal formado o sin 'palabras': {text}")
-            return None
-    except json.JSONDecodeError as e:
-        print(f"Error al decodificar JSON: {e} - Texto: {text}")
-        return None
+    # Set seed for reproducibility
+    set_seed(args.seed)
     
-def process_words(words, definitions):
-    outputs = {}
-    # Postprocess possible word leaks within the definition
-    for id, predicted_words in enumerate(words):
-        word = definitions.loc[id].word.lower()
-
-        if config["categories"]:
-            cat = definitions.loc[id].category.lower()
-        definition = definitions.loc[id].definition.lower()
-        predicted_words = predicted_words.lower()
-
-        print(f"Palabra: {word} - Texto original: {predicted_words}")
-        
-        # Intentar extraer JSON
-        predicted_words_data = extract_json(predicted_words)
-
-        if predicted_words_data and "palabras" in predicted_words_data:
-            predicted_words_text = predicted_words_data["palabras"]
-            predicted_words_text = " ".join(map(str, predicted_words_text))
-        else:
-            # Si no tiene un formato JSON correcto, intentamos limpiar la definición lo mejor posible
-            predicted_words_text = predicted_words  # Usar el texto original si no es JSON
-            predicted_words_text = predicted_words_text.split(":")[-1]    # Ignorar la clave del JSON si existe
-            predicted_words_text = predicted_words_text.replace('"', '') # Eliminar posibles comillas dobles sobrantes
-            predicted_words_text = predicted_words_text.replace("'", '') # Eliminar posibles comillas simples sobrantes
-            predicted_words_text = predicted_words_text.replace('{', '') # Eliminar posibles llaves sobrantes
-            predicted_words_text = predicted_words_text.replace('}', '') # Eliminar posibles llaves sobrantes
-            predicted_words_text = predicted_words_text.replace('[', '') # Eliminar posibles corchetes sobrantes
-            predicted_words_text = predicted_words_text.replace(']', '') # Eliminar posibles corchetes sobrantes
-            predicted_words_text = predicted_words_text.strip()   # Eliminar posibles espacios sobrantes
-        
-        if not predicted_words_text:
-            predicted_words_text = "Definición no conocida."
-
-        print(f"Texto final: {predicted_words_text}")
-        
-        outputs[id] = [word, cat, definition, predicted_words_text] if config["categories"] else [word, definition, predicted_words_text]
-    return outputs
+    # Load config
+    config = EvaLexConfig.from_yaml(args.config)
     
-if __name__ == "__main__":
-    set_seed(0)
-
-    with open(sys.argv[1], "r") as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
-
-    model_name = config["model_name"]
-    model_id = f"/mnt/beegfs/sinai-data/{model_name}"
-
-    tokenizer = AutoTokenizer.from_pretrained(model_id, padding_side="left")
-
-    tokenizer.pad_token = tokenizer.eos_token  # Most LLMs don't have a pad token by default
-
-    model = AutoModelForCausalLM.from_pretrained(
-        model_id,
-        device_map="auto"
-    )
-
-    # Sanitize model name
-    model_name = model_name.replace("/", "_")
-    definitions_path = f"generations/v{config['iter']}/{model_name}_{config['words'].split('.')[0].split('/')[-1]}.tsv"
+    # Override backend if specified
+    if args.backend:
+        config.backend = args.backend
+    
+    print(f"Generating words with {config.model_name} (backend: {config.backend})")
+    
+    # Load definitions from previous step
+    model_name = config.get_sanitized_model_name()
+    definitions_path = config.get_generations_path() / config.get_output_filename()
+    
+    if not definitions_path.exists():
+        print(f"Error: Definitions file not found: {definitions_path}")
+        print("Please run generate-definitions.py first.")
+        sys.exit(1)
+    
     definitions = pd.read_csv(definitions_path, sep="\t", keep_default_na=False, na_values=[])
-
-    print(f"Generating list of words with {model_name}")
-
-    # Load prompts
-    with open(config["prompts"], "r") as f:
-        prompts = json.load(f)
-
-    prompt_ds = create_dataset_from_prompt(definitions, prompts["words"])
-
-    batch_size = config["batch_size_words"]
-    stop_strings = config["stop_strings"]
-
-    words = generate_words(prompt_ds, model, tokenizer, batch_size, stop_strings)
-    outputs = process_words(words, definitions)
-    columns = ["word", "category", "definition", "predicted_words"] if config["categories"] else ["word", "definition", "predicted_words"]
-    output_df = pd.DataFrame.from_dict(outputs, orient="index", columns=columns)
+    print(f"Loaded {len(definitions)} definitions from {definitions_path}")
     
-    # Save results
-    outname = f"{model_name}_{config['words'].split('.')[0].split('/')[-1]}.tsv"
-    outdir = f"generations/v{config['iter']}"
-    if not os.path.exists(outdir):
-        os.mkdir(outdir) 
+    # Create components
+    backend = create_backend(config)
+    prompt_manager = PromptManager(config.prompts_file if config.prompts_file else None)
+    
+    # Create generator
+    generator = WordGenerator(
+        backend=backend,
+        prompt_manager=prompt_manager,
+        config=config,
+    )
+    
+    # Generate words
+    print("Generating candidate words...")
+    words_df = generator.generate(definitions)
+    
+    # Clean up
+    backend.cleanup()
+    
+    # Save results (overwrite the definitions file with the complete data)
+    output_dir = config.get_generations_path()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    output_file = output_dir / config.get_output_filename()
+    words_df.to_csv(output_file, sep="\t", index=False)
+    
+    print(f"Saved {len(words_df)} word predictions to {output_file}")
 
-    fullname = os.path.join(outdir, outname)
 
-    output_df.to_csv(fullname, sep="\t", index=False)
+if __name__ == "__main__":
+    main()
