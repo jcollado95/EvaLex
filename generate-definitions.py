@@ -204,6 +204,7 @@ def process_definitions_v2(definitions, words, num_return_sequences, nlp):
         if definition_text:
             try:
                 anonymized_definition = anonymize_word_by_lemma(nlp, definition_text, word)
+                anonymized_definition = re.sub(rf'\b{re.escape(word)}\b', '_', anonymized_definition, flags=re.IGNORECASE)
             except Exception as e:
                 print(f"Error in lemmatization: {e}")
                 anonymized_definition = re.sub(rf'\b{re.escape(word)}\b', '_', definition_text, flags=re.IGNORECASE)
