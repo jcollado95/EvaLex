@@ -6,8 +6,8 @@ EvaLex is a benchmark designed to automatically evaluate Lexical Competence in L
 
 - **Modular Pipeline**: Generate definitions → Generate candidate words → Evaluate results
 - **Multiple Backends**: Support for local models (via transformers) and remote models (via OpenAI API)
-- **Gradio Interface**: User-friendly web interface for evaluation and model comparison
-- **Ranking Leaderboard**: Compare performance across different models
+- (WIP) **Gradio Interface**: User-friendly web interface for evaluation and model comparison
+- (WIP) **Ranking Leaderboard**: Compare performance across different models
 
 ## Getting Started
 
