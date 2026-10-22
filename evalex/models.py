@@ -6,6 +6,7 @@ Supports both local models (via transformers) and remote models (via OpenAI API)
 
 import json
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any, Optional
 
 import torch
@@ -147,6 +148,10 @@ class OpenAIModelBackend(ModelBackend):
         model_name: str,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
+        timeout: float = 600.0,
+        max_concurrency: int = 1,
+        extra_body: Optional[Dict[str, Any]] = None,
+        raise_errors: bool = False,
     ):
         """
         Initialize the OpenAI API backend.
@@ -155,11 +160,19 @@ class OpenAIModelBackend(ModelBackend):
             model_name: Name of the model to use
             api_key: OpenAI API key (defaults to OPENAI_API_KEY env var)
             base_url: Base URL for the API (defaults to OPENAI_BASE_URL env var)
+            timeout: Request timeout in seconds
+            max_concurrency: Maximum number of concurrent requests
+            extra_body: Extra parameters sent with every request
+                (e.g. {"chat_template_kwargs": {"enable_thinking": False}} for vLLM)
+            raise_errors: Raise API errors instead of returning empty outputs
         """
         import os
         from openai import OpenAI
         
         self.model_name = model_name
+        self.max_concurrency = max_concurrency
+        self.extra_body = extra_body
+        self.raise_errors = raise_errors
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.base_url = base_url or os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
         
@@ -169,6 +182,7 @@ class OpenAIModelBackend(ModelBackend):
         self.client = OpenAI(
             api_key=self.api_key,
             base_url=self.base_url,
+            timeout=timeout,
         )
     
     def generate(
@@ -181,24 +195,35 @@ class OpenAIModelBackend(ModelBackend):
         stop_strings: Optional[str] = None,
     ) -> List[str]:
         """Generate text completions for a batch of message sequences."""
-        results = []
+        # One request per returned sequence, in the same order as the sequential version
+        requests = [
+            message_list
+            for message_list in messages
+            for _ in range(num_return_sequences)
+        ]
         
-        for message_list in messages:
-            for _ in range(num_return_sequences):
-                try:
-                    response = self.client.chat.completions.create(
-                        model=self.model_name,
-                        messages=message_list,
-                        max_tokens=max_new_tokens,
-                        temperature=temperature if do_sample else 0,
-                        stop=[stop_strings] if stop_strings else None,
-                    )
-                    results.append(response.choices[0].message.content or "")
-                except Exception as e:
-                    print(f"OpenAI API error: {e}")
-                    results.append("")
+        def complete(message_list: List[Dict[str, str]]) -> str:
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=message_list,
+                    max_tokens=max_new_tokens,
+                    temperature=temperature if do_sample else 0,
+                    stop=[stop_strings] if stop_strings else None,
+                    extra_body=self.extra_body,
+                )
+                return response.choices[0].message.content or ""
+            except Exception as e:
+                if self.raise_errors:
+                    raise
+                print(f"OpenAI API error: {e}")
+                return ""
         
-        return results
+        if self.max_concurrency <= 1:
+            return [complete(message_list) for message_list in requests]
+        
+        with ThreadPoolExecutor(max_workers=self.max_concurrency) as executor:
+            return list(executor.map(complete, requests))
     
     def cleanup(self) -> None:
         """No cleanup needed for API backend."""

@@ -3,6 +3,7 @@ slurm-output
 launcher.sbs
 requirements
 archived
+demo/usage/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

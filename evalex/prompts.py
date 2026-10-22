@@ -105,22 +105,165 @@ DEFAULT_WORDS_PROMPT_WITH_CATEGORY = [
     {"role": "user", "content": "Definición: {definition} (categoría: {cat})"},
 ]
 
+DEFAULT_DEFINITION_PROMPT_EN = [
+    {
+        "role": "system",
+        "content": (
+            "You are an expert in English vocabulary. Your task is to provide a definition for a given word.\n"
+            "Instructions:\n"
+            "- The definition must be objective and clear.\n"
+            "- Use between 5 and 25 words.\n"
+            "- The generated definition must not include the original word or any direct derivatives or lexical family members.\n"
+            "IMPORTANT:\n"
+            "The response must be a **JSON object**:\n"
+            "Response format:\n"
+            "{\n"
+            '  "word": "(original word)",\n'
+            '  "definition": "(definition without using the word or its lexical family)"\n'
+            "}"
+        ),
+    },
+    {"role": "user", "content": "Word: {word}"},
+]
+
+DEFAULT_WORDS_PROMPT_EN = [
+    {
+        "role": "system",
+        "content": (
+            "You are an expert in English vocabulary. Your task is to find a list of possible English words that can be defined by a given definition.\n\n"
+            "INSTRUCTIONS:\n"
+            "- The possible words must not appear in the definition.\n"
+            "- Generate all words that fit the definition.\n"
+            "- Respond with an empty list if no suitable words are found for the given definition.\n"
+            "- The response must be a **JSON object**.\n"
+            "Response format:\n"
+            "{\n"
+            '  "words": ["(word 1)", "(word 2)", "(word n)"]\n'
+            "}"
+        ),
+    },
+    {
+        "role": "user",
+        "content": "Definition: writing instrument that uses ink and has a tip",
+    },
+    {
+        "role": "assistant",
+        "content": '{\n  "words": ["pen", "fountain pen", "ballpoint"]\n}',
+    },
+    {"role": "user", "content": "Definition: {definition}"},
+]
+
+DEFAULT_DEFINITION_PROMPT_FR = [
+    {
+        "role": "system",
+        "content": (
+            "Tu es un expert du vocabulaire français. Ta tâche consiste à donner une définition pour un mot donné.\n"
+            "Instructions :\n"
+            "- La définition doit être objective et claire.\n"
+            "- Utilise entre 5 et 25 mots.\n"
+            "- La définition générée ne doit pas inclure le mot d'origine ni ses dérivés directs ou sa famille lexicale.\n"
+            "IMPORTANT :\n"
+            "La réponse doit être un **objet JSON** :\n"
+            "Format de réponse :\n"
+            "{\n"
+            '  "mot": "(mot d\'origine)",\n'
+            '  "définition": "(définition sans utiliser le mot ni sa famille lexicale)"\n'
+            "}"
+        ),
+    },
+    {"role": "user", "content": "Mot : {word}"},
+]
+
+DEFAULT_WORDS_PROMPT_FR = [
+    {
+        "role": "system",
+        "content": (
+            "Tu es un expert du vocabulaire français. Ta tâche consiste à trouver une liste de mots français possibles qui correspondent à une définition donnée.\n\n"
+            "INSTRUCTIONS :\n"
+            "- Les mots possibles n'apparaissent pas dans la définition.\n"
+            "- Génère tous les mots qui correspondent à la définition.\n"
+            "- Réponds avec une liste vide si tu ne trouves aucun mot adapté à la définition donnée.\n"
+            "- La réponse doit être un **objet JSON**.\n"
+            "Format de réponse :\n"
+            "{\n"
+            '  "mots": ["(mot 1)", "(mot 2)", "(mot n)"]\n'
+            "}"
+        ),
+    },
+    {
+        "role": "user",
+        "content": "Définition : instrument d'écriture qui utilise de l'encre et possède une pointe",
+    },
+    {
+        "role": "assistant",
+        "content": '{\n  "mots": ["stylo", "plume", "stylo-plume"]\n}',
+    },
+    {"role": "user", "content": "Définition : {definition}"},
+]
+
+# Supported prompt languages (code -> display name)
+LANGUAGES = {"es": "Español", "en": "English", "fr": "Français"}
+
+# Default prompts and expected JSON response keys per language
+DEFAULT_PROMPTS = {
+    "es": {
+        "def": DEFAULT_DEFINITION_PROMPT,
+        "words": DEFAULT_WORDS_PROMPT,
+        "def_key": "definición",
+        "words_key": "palabras",
+    },
+    "en": {
+        "def": DEFAULT_DEFINITION_PROMPT_EN,
+        "words": DEFAULT_WORDS_PROMPT_EN,
+        "def_key": "definition",
+        "words_key": "words",
+    },
+    "fr": {
+        "def": DEFAULT_DEFINITION_PROMPT_FR,
+        "words": DEFAULT_WORDS_PROMPT_FR,
+        "def_key": "définition",
+        "words_key": "mots",
+    },
+}
+
 
 class PromptManager:
     """Manages prompts for definition and word generation."""
     
-    def __init__(self, prompts_file: Optional[str] = None):
+    def __init__(
+        self,
+        prompts_file: Optional[str] = None,
+        language: str = "es",
+        def_prompt: Optional[List[Dict[str, str]]] = None,
+        words_prompt: Optional[List[Dict[str, str]]] = None,
+    ):
         """
         Initialize the prompt manager.
-        
+
         Args:
             prompts_file: Path to JSON file with custom prompts
+            language: Language of the default prompts (see LANGUAGES)
+            def_prompt: Optional custom definition prompt (overrides the default)
+            words_prompt: Optional custom words prompt (overrides the default)
         """
-        self.def_prompt = DEFAULT_DEFINITION_PROMPT
-        self.def_prompt_with_cat = DEFAULT_DEFINITION_PROMPT_WITH_CATEGORY
-        self.words_prompt = DEFAULT_WORDS_PROMPT
-        self.words_prompt_with_cat = DEFAULT_WORDS_PROMPT_WITH_CATEGORY
-        
+        defaults = DEFAULT_PROMPTS[language]
+        self.def_key = defaults["def_key"]
+        self.words_key = defaults["words_key"]
+
+        if language == "es":
+            self.def_prompt = DEFAULT_DEFINITION_PROMPT
+            self.def_prompt_with_cat = DEFAULT_DEFINITION_PROMPT_WITH_CATEGORY
+            self.words_prompt = DEFAULT_WORDS_PROMPT
+            self.words_prompt_with_cat = DEFAULT_WORDS_PROMPT_WITH_CATEGORY
+        else:
+            self.def_prompt = self.def_prompt_with_cat = defaults["def"]
+            self.words_prompt = self.words_prompt_with_cat = defaults["words"]
+
+        if def_prompt:
+            self.def_prompt = self.def_prompt_with_cat = def_prompt
+        if words_prompt:
+            self.words_prompt = self.words_prompt_with_cat = words_prompt
+
         if prompts_file:
             self.load_prompts(prompts_file)
     

@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evalex"
+dynamic = ["version"]
+description = "Automatic evaluation of lexical competence in language models"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    { name = "Jaime Collado-Montañez", email = "jcollado@ujaen.es" },
+    { name = "L. Alfonso Ureña-López" },
+    { name = "Arturo Montejo-Ráez" },
+]
+dependencies = [
+    "accelerate>=1.2.0",
+    "nltk>=3.9.0",
+    "numpy>=2.2.0",
+    "pandas>=2.2.0",
+    "protobuf>=6.30.0",
+    "PyYAML>=6.0.0",
+    "sentencepiece>=0.2.0",
+    "stanza>=1.10.0",
+    "torch>=2.5.0",
+    "tqdm>=4.67.0",
+    "transformers>=4.47.0",
+]
+
+[project.optional-dependencies]
+openai = ["openai>=1.0.0"]
+demo = ["gradio>=5.0.0", "python-dotenv>=1.0.0"]
+
+[project.urls]
+Repository = "https://github.com/jcollado95/EvaLex"
+
+[tool.setuptools]
+packages = ["evalex"]
+
+[tool.setuptools.dynamic]
+version = { attr = "evalex.__version__" }

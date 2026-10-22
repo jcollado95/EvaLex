@@ -68,11 +68,7 @@ typing_extensions>=4.9.0
 # nvidia-nvtx-cu12>=12.1.0
 # triton>=3.1.0
 
-# Web interface
-gradio>=4.0.0
-
-# OpenAI API support
+# OpenAI API support (--backend openai)
 openai>=1.0.0
 
-# Visualization (for Gradio ranking charts)
-matplotlib>=3.8.0
+# The Gradio demo has its own dependencies: pip install -e ".[demo]"

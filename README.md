@@ -6,8 +6,7 @@ EvaLex is a benchmark designed to automatically evaluate Lexical Competence in L
 
 - **Modular Pipeline**: Generate definitions → Generate candidate words → Evaluate results
 - **Multiple Backends**: Support for local models (via transformers) and remote models (via OpenAI API)
-- (WIP) **Gradio Interface**: User-friendly web interface for evaluation and model comparison
-- (WIP) **Ranking Leaderboard**: Compare performance across different models
+- **Interactive Demo**: Gradio web interface to evaluate words in Spanish, English or French with editable prompts
 
 ## Getting Started
 
@@ -24,25 +23,45 @@ git clone https://github.com/jcollado95/EvaLex.git
 cd EvaLex
 ```
 
-Install required dependencies:
+Install EvaLex and its dependencies:
 
 ```bash
-pip install -r requirements.txt
+pip install -e .            # core pipeline (CLI)
+pip install -e ".[openai]"  # + OpenAI-compatible API backend
+pip install -r demo/requirements.txt  # + Gradio web demo
 ```
+
+Alternatively, `pip install -r requirements.txt` installs the environment used for the paper experiments (without the demo).
+
+### Reproducing the paper
+
+The exact code, data, generations and results reported in the EMNLP 2026 paper are frozen under the `v1.0-emnlp2026` tag:
+
+```bash
+git checkout v1.0-emnlp2026
+```
+
+The paper results are in `generations/` and `results/`. To regenerate them, run the command-line pipeline (Option 2 below) with the configs in `config/`.
 
 ### Usage
 
 #### Option 1: Web Interface (Recommended)
 
-Launch the Gradio web interface:
+The demo sends its requests to an OpenAI-compatible inference server. Copy `.env.example` to `.env` and fill in the server URL and API key:
 
 ```bash
-python app.py
+cp .env.example .env
+pip install -r demo/requirements.txt
+python demo/app.py
 ```
 
-Then open `http://localhost:7860` in your browser. The interface provides:
-- **Evaluate Model**: Enter words, select a model, and get lexical competence scores
-- **Ranking**: Compare results across different models for default word lists
+On first start, the demo downloads the Stanza lemmatizers for Spanish, English and French. It uses them to hide every form of the target word in the generated definitions. Then open `http://localhost:7860` in your browser. Pick a language (Spanish, English or French) and a model, enter up to 20 words and press **Evaluate**. You can also change how many definitions the model writes per word and the token limit for each list of candidates. The prompts for both steps are shown next to the setup, and you can edit them. The results show which words the model knows, plus the definitions and candidate words behind each result.
+
+Every evaluation request (settings, prompts, words and results) is logged to a local SQLite database at `demo/usage/usage.sqlite3`, which is gitignored. Set `EVALEX_USAGE_DB` to use another path. No IP addresses are stored, only an anonymous session id. To print usage statistics:
+
+```bash
+python demo/usage.py
+```
 
 #### Option 2: Command Line Pipeline
 
@@ -109,7 +128,10 @@ EvaLex/
 │   ├── prompts.py          # Prompt templates
 │   ├── utils.py            # Utility functions
 │   └── pipeline.py         # Evaluation pipeline
-├── app.py                  # Gradio web interface
+├── demo/                   # Gradio web demo
+│   ├── app.py
+│   └── requirements.txt    # Demo dependencies (installs the local checkout)
+├── pyproject.toml          # Package definition and optional extras
 ├── generate-definitions.py # CLI: Step 1
 ├── generate-words.py       # CLI: Step 2
 ├── evaluate-words.py       # CLI: Step 3
@@ -122,7 +144,19 @@ EvaLex/
 
 ## Citation
 
-WIP
+If you use EvaLex in your research, please cite:
+
+```bibtex
+@inproceedings{collado-montanez-etal-2026-evalex,
+    title = "{E}va{L}ex: Automatic Evaluation of Lexical Competence in Language Models",
+    author = "Collado-Monta{\~n}ez, Jaime and
+      Ure{\~n}a-L{\'o}pez, L. Alfonso and
+      Montejo-R{\'a}ez, Arturo",
+    booktitle = "Proceedings of the 2026 Conference on Empirical Methods in Natural Language Processing",
+    year = "2026",
+    publisher = "Association for Computational Linguistics",
+}
+```
 
 ## Contact
 

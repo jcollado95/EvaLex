@@ -35,6 +35,7 @@ class EvaLexConfig:
     batch_size_def: int = 10
     batch_size_words: int = 10
     num_return_sequences: int = 5
+    max_new_tokens_words: int = 128
     stop_strings: Optional[str] = "}"
     
     # Output settings
@@ -44,6 +45,10 @@ class EvaLexConfig:
     
     # Stanza settings for lemmatization
     stanza_dir: Optional[str] = None
+
+    # Mask every form of the target word in definitions (any case, accents, shared lemma)
+    # instead of the lemma + exact match used in the paper
+    strict_masking: bool = False
     
     @classmethod
     def from_yaml(cls, path: str) -> "EvaLexConfig":
@@ -106,29 +111,3 @@ class EvaLexConfig:
         words_basename = Path(self.words_file).stem
         model_name = self.get_sanitized_model_name()
         return f"{model_name}_{words_basename}.tsv"
-
-
-# Default available models for the Gradio interface
-AVAILABLE_MODELS = {
-    "Local Models": [
-        "meta-llama/Llama-3.1-8B-Instruct",
-        "meta-llama/Llama-2-7b-chat-hf",
-        "mistralai/Mistral-7B-Instruct-v0.1",
-        "google/gemma-7b-it",
-        "01-ai/Yi-6B-Chat",
-        "BSC-LT/salamandra-7b-instruct",
-        "bertin-project/Gromenauer-7B-Instruct",
-    ],
-    "OpenAI API Models": [
-        "gpt-4o",
-        "gpt-4o-mini",
-        "gpt-4-turbo",
-        "gpt-3.5-turbo",
-    ],
-}
-
-# Default word lists for ranking
-DEFAULT_WORD_LISTS = [
-    "data/CREA_10k/3-CREA_10k_pos_filter.tsv",
-    "data/CREA_10k/4-CREA_10k_lemmas.tsv",
-]

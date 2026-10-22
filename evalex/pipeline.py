@@ -15,6 +15,7 @@ from evalex.prompts import PromptManager
 from evalex.utils import (
     process_definition_output,
     process_words_output,
+    parse_candidate_list,
     evaluate_word_known,
     calculate_lexical_competence,
 )
@@ -94,7 +95,13 @@ class DefinitionGenerator:
             word_idx = idx // num_sequences
             word = words_df.iloc[word_idx]["word"].lower()
             
-            processed_def = process_definition_output(definition, word, self.nlp)
+            processed_def = process_definition_output(
+                definition,
+                word,
+                self.nlp,
+                key=self.prompt_manager.def_key,
+                strict_masking=self.config.strict_masking,
+            )
             
             outputs[idx] = [word, processed_def]
         
@@ -110,6 +117,7 @@ class WordGenerator:
         backend: ModelBackend,
         prompt_manager: PromptManager,
         config: EvaLexConfig,
+        keep_candidate_lists: bool = False,
     ):
         """
         Initialize the word generator.
@@ -118,10 +126,13 @@ class WordGenerator:
             backend: Model backend for generation
             prompt_manager: Prompt manager for creating prompts
             config: EvaLex configuration
+            keep_candidate_lists: Also return each output as a list of candidates
+                (column 'candidates'), keeping multi-word terms intact
         """
         self.backend = backend
         self.prompt_manager = prompt_manager
         self.config = config
+        self.keep_candidate_lists = keep_candidate_lists
     
     def generate(
         self,
@@ -155,7 +166,7 @@ class WordGenerator:
             outputs = self.backend.generate(
                 batch,
                 num_return_sequences=1,
-                max_new_tokens=128,
+                max_new_tokens=self.config.max_new_tokens_words,
                 temperature=0,  # Deterministic for word prediction
                 do_sample=False,
                 stop_strings=self.config.stop_strings,
@@ -172,11 +183,19 @@ class WordGenerator:
             word = definitions_df.iloc[idx]["word"].lower()
             definition = definitions_df.iloc[idx]["definition"].lower()
             
-            processed_words = process_words_output(predicted)
+            processed_words = process_words_output(
+                predicted, key=self.prompt_manager.words_key
+            )
             
             outputs[idx] = [word, definition, processed_words]
+            if self.keep_candidate_lists:
+                outputs[idx].append(
+                    parse_candidate_list(predicted, key=self.prompt_manager.words_key)
+                )
         
         columns = ["word", "definition", "predicted_words"]
+        if self.keep_candidate_lists:
+            columns.append("candidates")
         return pd.DataFrame.from_dict(outputs, orient="index", columns=columns)
 
 
@@ -388,59 +407,61 @@ def load_results_for_ranking(
     results_path = Path(results_dir)
     all_results = []
     
-    # Find all result files
-    for version_dir in results_path.iterdir():
-        if not version_dir.is_dir():
-            continue
+    # Find all result files, both at the top level and inside version subdirectories
+    result_files = [(f, "") for f in sorted(results_path.glob("*.tsv"))]
+    for version_dir in sorted(results_path.iterdir()):
+        if version_dir.is_dir():
+            result_files += [(f, version_dir.name) for f in sorted(version_dir.glob("*.tsv"))]
+    
+    for result_file, version in result_files:
+        # Parse filename to get model and word list
+        filename = result_file.stem
+        parts = filename.split("_")
         
-        for result_file in version_dir.glob("*.tsv"):
-            # Parse filename to get model and word list
-            filename = result_file.stem
-            parts = filename.split("_")
+        # Model name is everything except the last part (word list)
+        if len(parts) >= 2:
+            # Find where the word list part starts
+            word_list_parts = []
+            model_parts = []
+            found_word_list = False
             
-            # Model name is everything except the last part (word list)
-            if len(parts) >= 2:
-                # Find where the word list part starts
-                word_list_parts = []
-                model_parts = []
-                found_word_list = False
+            for i, part in enumerate(parts):
+                # Check if this part is numeric or starts with a digit
+                # (the first part is always the model org, e.g. "01-ai")
+                if i > 0 and (part[0].isdigit() or part in ["CREA", "DEA", "palabras"]):
+                    found_word_list = True
                 
-                for i, part in enumerate(parts):
-                    # Check if this part is numeric or starts with a digit
-                    if part[0].isdigit() or part in ["CREA", "DEA", "palabras"]:
-                        found_word_list = True
+                if found_word_list:
+                    word_list_parts.append(part)
+                else:
+                    model_parts.append(part)
+            
+            model_name = "_".join(model_parts) if model_parts else filename
+            word_list = "_".join(word_list_parts) if word_list_parts else "unknown"
+            
+            # Apply filter if specified
+            if word_list_filter and word_list_filter not in word_list:
+                continue
+            
+            try:
+                df = pd.read_csv(result_file, sep="\t")
+                
+                if "group_known" in df.columns:
+                    known_count = df["group_known"].sum()
+                    total_count = len(df)
+                    accuracy = known_count / total_count if total_count > 0 else 0
                     
-                    if found_word_list:
-                        word_list_parts.append(part)
-                    else:
-                        model_parts.append(part)
-                
-                model_name = "_".join(model_parts) if model_parts else filename
-                word_list = "_".join(word_list_parts) if word_list_parts else "unknown"
-                
-                # Apply filter if specified
-                if word_list_filter and word_list_filter not in word_list:
-                    continue
-                
-                try:
-                    df = pd.read_csv(result_file, sep="\t")
-                    
-                    if "group_known" in df.columns:
-                        known_count = df["group_known"].sum()
-                        total_count = len(df)
-                        accuracy = known_count / total_count if total_count > 0 else 0
-                        
-                        all_results.append({
-                            "model": model_name.replace("_", "/"),
-                            "word_list": word_list,
-                            "known_words": int(known_count),
-                            "total_words": total_count,
-                            "accuracy": accuracy,
-                            "accuracy_pct": f"{accuracy * 100:.2f}%",
-                            "version": version_dir.name,
-                        })
-                except Exception as e:
-                    print(f"Error loading {result_file}: {e}")
+                    all_results.append({
+                        "model": model_name.replace("_", "/"),
+                        "word_list": word_list,
+                        "known_words": int(known_count),
+                        "total_words": total_count,
+                        "accuracy": accuracy,
+                        "accuracy_pct": f"{accuracy * 100:.2f}%",
+                        "version": version,
+                    })
+            except Exception as e:
+                print(f"Error loading {result_file}: {e}")
     
     if not all_results:
         return pd.DataFrame(columns=["model", "word_list", "known_words", "total_words", "accuracy", "accuracy_pct", "version"])
