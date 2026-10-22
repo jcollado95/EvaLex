@@ -204,6 +204,17 @@ CSS = """
 .ev-lang label span { white-space: nowrap !important; }
 
 /* Word input + chips */
+.ev-word-input .input-container { align-items: stretch !important; gap: 8px !important; }
+.ev-word-input .submit-button {
+    height: auto !important; min-width: 72px !important; padding: 0 16px !important;
+    border-radius: var(--input-radius) !important; font-weight: 600 !important;
+    background: var(--primary-50) !important; color: var(--primary-700) !important;
+    border: 1px solid var(--primary-200) !important;
+}
+.ev-word-input .submit-button:hover { background: var(--primary-100) !important; }
+.dark .ev-word-input .submit-button { background: rgba(99, 102, 241, 0.15) !important; color: var(--primary-200) !important;
+    border-color: rgba(129, 140, 248, 0.35) !important; }
+.dark .ev-word-input .submit-button:hover { background: rgba(99, 102, 241, 0.25) !important; }
 .ev-words-title { margin: 4px 0 0 !important; font-size: var(--text-sm); color: var(--body-text-color-subdued); }
 .ev-chips { flex-wrap: wrap !important; gap: 8px !important; }
 .ev-chips button {
@@ -667,6 +678,7 @@ def build_interface() -> gr.Blocks:
                     placeholder=f"e.g. {EXAMPLE_WORDS[default_language][1]}",
                     max_lines=1,
                     submit_btn="Add",
+                    elem_classes="ev-word-input",
                 )
 
                 @gr.render(inputs=word_list)
