@@ -149,12 +149,23 @@ If you use EvaLex in your research, please cite:
 ```bibtex
 @inproceedings{collado-montanez-etal-2026-evalex,
     title = "{E}va{L}ex: Automatic Evaluation of Lexical Competence in Language Models",
-    author = "Collado-Monta{\~n}ez, Jaime and
-      Ure{\~n}a-L{\'o}pez, L. Alfonso and
+    author = "Collado-Monta{\~n}ez, Jaime  and
+      Ure{\~n}a, L. Alfonso  and
       Montejo-R{\'a}ez, Arturo",
+    editor = "Lee, Hung-Yi  and
+      Dev, Sunipa  and
+      Li, Jessy  and
+      Elliott, Desmond",
     booktitle = "Proceedings of the 2026 Conference on Empirical Methods in Natural Language Processing",
+    month = oct,
     year = "2026",
+    address = "Budapest, Hungary",
     publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2026.emnlp-main.2490/",
+    doi = "10.18653/2026.emnlp-main.2490",
+    pages = "56526--56539",
+    ISBN = "979-8-89176-459-0",
+    abstract = "Existing methods for evaluating lexical competence in language models often rely on discriminative tasks or expensive, human-curated datasets. We introduce EvaLex, an automated framework to evaluate lexical competence in language models without gold labels. EvaLex employs a bidirectional approach: it first prompts a model to define a target word and subsequently tasks the model with retrieving that same word from its own generated definition in a separate inference session. We evaluate EvaLex on two Spanish datasets: CREA-10k-POS (7,784 words) and CREA-10k-Lemmas (4,594 lemmas), and we further validate against an expert-annotated DEA sample (100 words). We compare similarly sized LLMs (Llama, Mistral, Yi, Gemma) alongside Spanish-centric models (Gromenauer, Salamandra). EvaLex scores correlate strongly with expert manual annotations (Pearson r = 0.8539, Spearman rho = 0.8) across the four models for which manual annotations were available, supporting its use as a proxy for human judgments. Broader validation across more models and languages remains an open priority. We also observe a clear frequency effect, with Spanish-specific models remaining more robust on low-frequency terms. Overall, EvaLex provides a scalable and low-cost method for model selection and for diagnosing lexical gaps in low-resource and cross-lingual settings."
 }
 ```
 
